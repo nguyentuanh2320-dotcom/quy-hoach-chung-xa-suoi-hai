@@ -360,6 +360,7 @@
         <summary><span class="tri"></span>Hiển thị</summary>
         <div class="in">
           <div class="row"><input id="showLabels" type="checkbox" checked><label for="showLabels">Nhãn ký hiệu (khi phóng to)</label></div>
+          <div class="row" id="hatchRow" hidden><input id="showHatch" type="checkbox"><label for="showHatch">Ký hiệu hatch như ArcGIS</label></div>
         </div>
       </details>
       <details class="sec" open>
@@ -431,6 +432,8 @@ const CONFIG = {
   PROJECT_KEY: 'suoihai',
   DB_PREFIX: 'suoihai/',
   DATA_DIR: '',
+  HATCH_FILE: 'kyhieu_hatch.json',      // ký hiệu hatch xuất từ ArcGIS Pro (cim2hatch.py); xoá dòng này = chỉ tô màu
+  HATCH_DEFAULT: true,                   // mở trang là hiện hatch (người xem tắt được ở mục Hiển thị)
   HIDE_RE: /^bt_/,                       // trường kỹ thuật do công cụ chuẩn hoá sinh ra: ẩn mặc định
   ZONE: null,                            // không có lớp ô quy hoạch
   STATS: [
@@ -467,7 +470,7 @@ const PALETTE = ['#8dd3c7', '#ffffb3', '#bebada', '#fb8072', '#80b1d3', '#fdb462
 const firstLine = v => isEmpty(v) ? null : String(v).split(/\r?\n/)[0].trim();
 const sddLayer = (code, title, on, style) => ({
   id: 'SDD_' + code, src: 'Chuc_nang_su_dung_dat', where: p => p.bt_giaiDoan === code, newProps: { bt_giaiDoan: code },
-  group: 'Sử dụng đất', title, geom: 'polygon', on, cat: 'phanLoai', colors: LAND, stroke: '#555', fillOpacity: .72, hitPri: 1, ...style,
+  group: 'Sử dụng đất', title, geom: 'polygon', on, cat: 'phanLoai', colors: LAND, hatch: 'sdd', stroke: '#555', fillOpacity: .72, hitPri: 1, ...style,
   label: { html: p => p.kyHieuLoDat, cls: 'lbl-lot', min: 16, max: 99 }, search: 'kyHieuLoDat', key: p => p.kyHieuLoDat || p.tenCongTrinhTrenDat
 });
 
@@ -486,7 +489,7 @@ const LAYERS = [
     colors: { 'Nhà văn hóa, thư viện, nhà hát': '#ae3ec9', 'Trường mầm non': '#fab005', 'Trường tiểu học': '#f08c00', 'Trường trung học cơ sở': '#e8590c', 'Trường trung học phổ thông': '#c92a2a', 'Trung tâm y tế': '#e64980', 'Cảng tổng hợp': '#1c7ed6' },
     search: 'phanLoai' },
   // ---- Giao thông ----
-  { id: 'Cong_trinh_giao_thong_dang_vung', group: 'Giao thông', title: 'Bến xe (mặt bằng)', geom: 'polygon', color: '#ced4da', stroke: '#495057', weight: 1.2, fillOpacity: .6, hitPri: 3 },
+  { id: 'Cong_trinh_giao_thong_dang_vung', group: 'Giao thông', title: 'Bến xe (mặt bằng)', geom: 'polygon', hatch: 'ctgt', color: '#ced4da', stroke: '#495057', weight: 1.2, fillOpacity: .6, hitPri: 3 },
   { id: 'Bo_via_va_dai_phan_cach', group: 'Giao thông', title: 'Bó vỉa, dải phân cách', geom: 'line', color: '#6c757d', weight: 1 },
   { id: 'Mang_luoi_giao_thong_duong_bo_dang_duong_tim_duong', group: 'Giao thông', title: 'Tim đường', geom: 'line', cat: 'loaiDuong', weight: 2.2,
     colors: { 'Đường cao tốc': '#c92a2a', 'Đường vành đai': '#e8590c', 'Đường tỉnh': '#f08c00', 'Đường liên khu vực': '#1971c2', 'Đường chính khu vực': '#2f9e44', 'Đường khu vực': '#868e96' },
@@ -739,8 +742,52 @@ function styleOf(def, f) {
   const s = styleBase(def, f);
   return def.styleBy ? Object.assign(s, def.styleBy(f.properties || {}, s)) : s;
 }
+/* ---------- Ký hiệu hatch xuất từ ArcGIS Pro (CONFIG.HATCH_FILE, tạo bằng cim2hatch.py) ----------
+   Mỗi lớp khai báo hatch: '<khoá trong file>' ; mỗi loại = { o: màu viền, ow: rộng viền (pt), t: [rộng, cao ô lặp] (pt),
+   s: [[màu nét, rộng nét (pt), 'path SVG trong ô']] }. Kích thước tính theo pt như ArcGIS (1 pt = 4/3 px màn hình). */
+const HATCH = { data: null, pat: {}, url: {} };
+S.hatch = CONFIG.HATCH_DEFAULT !== false;
+function loadHatch() {
+  if (!CONFIG.HATCH_FILE) return Promise.resolve();
+  return fetch((CONFIG.DATA_DIR || '') + CONFIG.HATCH_FILE).then(r => r.ok ? r.json() : null).then(j => { HATCH.data = j; }).catch(() => {});
+}
+function hatchDef(def, cls) { const set = def.hatch && HATCH.data && HATCH.data[def.hatch]; const h = set && (set[cls] || set['*']); return h && h.t ? h : null; }
+function hatchTile(def, cls, m) {   // vẽ 1 ô lặp ở độ phân giải m (px thiết bị / px CSS)
+  const h = hatchDef(def, cls); if (!h) return null;
+  const PT = 4 / 3, c = document.createElement('canvas');
+  c.width = Math.max(1, Math.round(h.t[0] * PT * m)); c.height = Math.max(1, Math.round(h.t[1] * PT * m));
+  const x = c.getContext('2d'); x.scale(c.width / h.t[0], c.height / h.t[1]);
+  const bg = h.bg ? `rgba(${h.bg},${CONFIG.HATCH_FILL_ALPHA ?? .35})` : (CONFIG.HATCH_BG ?? 'rgba(255,255,255,.6)');
+  if (bg) { x.fillStyle = bg; x.fillRect(0, 0, h.t[0], h.t[1]); }
+  x.lineCap = 'butt';
+  h.s.forEach(([col, w, d]) => { x.strokeStyle = `rgb(${col})`; x.lineWidth = Math.max(w, .45); x.stroke(new Path2D(d)); });
+  return c;
+}
+function hatchPattern(def, cls) {
+  const k = def.hatch + '|' + cls; if (k in HATCH.pat) return HATCH.pat[k];
+  const m = L.Browser.retina ? 2 : 1, c = hatchTile(def, cls, m); let p = null;
+  if (c) { p = c.getContext('2d').createPattern(c, 'repeat'); if (p.setTransform) p.setTransform(new DOMMatrix().scale(1 / m)); }
+  return (HATCH.pat[k] = p);
+}
+function hatchUrl(def, cls) {   // ảnh ô lặp cho ô chú giải
+  const k = def.hatch + '|' + cls; if (k in HATCH.url) return HATCH.url[k];
+  const c = hatchTile(def, cls, 2); return (HATCH.url[k] = c ? c.toDataURL() : null);
+}
+const hatchOn = def => S.hatch && !!def.hatch && def.geom === 'polygon' && !!HATCH.data;
+function swStyle(def, cls, color) {   // style cho ô màu (bảng lớp, chú giải)
+  if (hatchOn(def)) { const h = hatchDef(def, cls), u = h && hatchUrl(def, cls);
+    if (u) return `background:#fff url(${u}) 0 0/${(h.t[0] * 2 / 3).toFixed(1)}px ${(h.t[1] * 2 / 3).toFixed(1)}px;border:1px solid rgb(${h.o})`; }
+  return `background:${color}`;
+}
+function refreshSwatches() {
+  document.querySelectorAll('.swatch[data-sw]').forEach(e => { const [id, ...r] = e.dataset.sw.split('|'), d = byId[id]; if (d) e.style.cssText = swStyle(d, r.join('|'), e.dataset.c); });
+}
 function styleBase(def, f) {
   const c = (def.catColor && def.catColor[f._cat]) || def.color, k = def.op * def.opG * S.opAll;
+  if (def.geom === 'polygon' && def.fill !== false && hatchOn(def)) {
+    const h = hatchDef(def, f._cat), p = h && hatchPattern(def, f._cat);
+    if (p) return { stroke: def.weight > 0, color: `rgb(${h.o})`, weight: def.weight, opacity: k, fill: true, fillColor: p, fillOpacity: k, dashArray: def.dash || null };
+  }
   if (def.geom === 'polygon') return { stroke: def.weight > 0, color: def.stroke, weight: def.weight, opacity: k, fill: def.fill !== false, fillColor: c, fillOpacity: def.fillOpacity * k, dashArray: def.dash || null };
   if (def.geom === 'line') return { color: c, weight: def.weight, opacity: k, dashArray: def.dash || null, lineCap: def.dash ? 'butt' : 'round' };
   return { radius: def.radius, color: '#fff', weight: 1, opacity: k, fillColor: c, fillOpacity: k };
@@ -970,7 +1017,8 @@ function swatchHtml(def) {
   if (def.geom === 'line') return `<span class="swatch line" style="border-top-color:${c};${def.dash ? 'border-top-style:dashed' : ''}"></span>`;
   if (def.geom === 'point') return `<span class="swatch dot" style="background:${c}"></span>`;
   if (def.fill === false) return `<span class="swatch" style="background:transparent;border:2px solid ${def.stroke}"></span>`;
-  return `<span class="swatch" style="background:${c}"></span>`;
+  const cn = def.cats ? def.cats[0].name : '*';
+  return `<span class="swatch" data-sw="${esc(def.id + '|' + cn)}" data-c="${c}" style="${swStyle(def, cn, c)}"></span>`;
 }
 const fmtN = n => n.toLocaleString('vi-VN');
 function layerNode(def, g = def.group) {
@@ -982,7 +1030,7 @@ function layerNode(def, g = def.group) {
   if (def.cats && def.cats.length > 1) {
     const c = n.querySelector('.cats');
     def.cats.forEach(cat => {
-      const l = el('label', 'cat-row', `<input type="checkbox"${def.hidden.has(cat.name) ? '' : ' checked'}><span class="swatch" style="background:${cat.color}"></span><span class="nm">${esc(cat.name)}</span><span class="meta">${fmtN(cat.n)}</span>`);
+      const l = el('label', 'cat-row', `<input type="checkbox"${def.hidden.has(cat.name) ? '' : ' checked'}><span class="swatch" data-sw="${esc(def.id + '|' + cat.name)}" data-c="${cat.color}" style="${swStyle(def, cat.name, cat.color)}"></span><span class="nm">${esc(cat.name)}</span><span class="meta">${fmtN(cat.n)}</span>`);
       l.querySelector('input').addEventListener('change', e => {
         if (e.target.checked) def.hidden.delete(cat.name); else def.hidden.add(cat.name);
         const ci = def.cats.indexOf(cat), v = e.target.checked;
@@ -1089,7 +1137,7 @@ function updateLegend() {
   defs.filter(d => d.on && d.feats.length).sort((a, b) => b.order - a.order).forEach(d => {
     const multi = d.cats && d.cats.length > 1;
     rows.push(`<div class="lg-t">${multi ? '' : swatchHtml(d)}<span>${esc(d.title)}</span></div>`);
-    if (multi) d.cats.filter(c => !d.hidden.has(c.name)).forEach(c => rows.push(`<div class="lg-c"><span class="swatch" style="background:${c.color}"></span><span>${esc(c.name)}</span></div>`));
+    if (multi) d.cats.filter(c => !d.hidden.has(c.name)).forEach(c => rows.push(`<div class="lg-c"><span class="swatch" style="${swStyle(d, c.name, c.color)}"></span><span>${esc(c.name)}</span></div>`));
   });
   box.innerHTML = '<div class="lg-h">Chú giải</div>' + (rows.join('') || '<div>(chưa bật lớp nào)</div>');
 }
@@ -1628,7 +1676,7 @@ async function main() {
   // Thứ tự tải: lớp lõi → lớp bật sẵn → các lớp còn lại (trình duyệt xếp hàng theo thứ tự gọi)
   const order = [...CONFIG.CORE.map(id => byId[id]), ...defs.filter(d => !CONFIG.CORE.includes(d.id) && wantOn(d)), ...defs.filter(d => !CONFIG.CORE.includes(d.id) && !wantOn(d))];
   const total = order.length; let done = 0;
-  const dbReady = dbLoad();
+  const dbReady = Promise.all([dbLoad(), loadHatch().then(() => { if (HATCH.data) { $('hatchRow').hidden = false; $('showHatch').checked = S.hatch; refreshSwatches(); } })]);
   const P = new Map(order.map(d => [d, Promise.all([loadLayer(d), dbReady]).then(([r]) => { d.raw = applyEdits(d, r); })]));
   const finish = d => {
     ingest(d); onLoaded(d);
@@ -1666,6 +1714,7 @@ async function main() {
 /* ===================== SỰ KIỆN GIAO DIỆN ===================== */
 $('search').addEventListener('input', e => runSearch(e.target.value));
 $('showLabels').addEventListener('change', e => { S.labels = e.target.checked; updateLabels(); });
+$('showHatch').addEventListener('change', e => { S.hatch = e.target.checked; restyleAll(d => !!d.hatch); refreshSwatches(); updateLegend(); });
 $('opAll').addEventListener('input', e => { S.opAll = e.target.value / 100; restyleAll(); });
 $('lyrFilter').addEventListener('input', e => {
   const q = e.target.value.trim().toLowerCase();
@@ -1774,8 +1823,8 @@ function dbLoad() {
   const job = Promise.all([
     dbFetch('/rest/v1/feature_edits?select=layer_id,oid,props,deleted,geom,is_new&limit=100000' + (CONFIG.DB_PREFIX ? '&layer_id=like.' + encodeURIComponent(CONFIG.DB_PREFIX) + '*' : '')).then(rows => (rows || []).forEach(r => DB.edits.set(editKey(r.layer_id, r.oid), r))),
     dbFetch('/rest/v1/layer_schema?select=layer_id,cfg' + (CONFIG.DB_PREFIX ? '&layer_id=like.' + encodeURIComponent(CONFIG.DB_PREFIX) + '*' : '')).then(rows => (rows || []).forEach(r => { DB.schema[r.layer_id] = r.cfg || {}; }))
-  ]).catch(e => { DB.loadError = e.message; });
-  return Promise.race([job, new Promise(r => setTimeout(() => { if (!DB.edits.size) DB.loadError = DB.loadError || 'máy chủ phản hồi chậm'; r(); }, 6000))]);
+  ]).catch(e => { DB.loadError = e.message; }).finally(() => { DB.loaded = true; });
+  return Promise.race([job, new Promise(r => setTimeout(() => { if (!DB.loaded) DB.loadError = DB.loadError || 'máy chủ phản hồi chậm'; r(); }, 6000))]);
 }
 const cfgOf = def => DB.schema[dbId(def)] || {};
 function applySchema(def, feats) {
