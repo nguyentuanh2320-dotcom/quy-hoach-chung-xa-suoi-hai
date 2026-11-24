@@ -380,7 +380,7 @@
         <div class="in">
           <div class="row"><input id="showLabels" type="checkbox" checked><label for="showLabels">Nhãn ký hiệu (khi phóng to)</label></div>
           <div class="row"><label for="refScale" style="margin-right:6px">Tỷ lệ tham chiếu</label><select id="refScale" title="Như Reference scale của ArcGIS: ở tỷ lệ này ký hiệu đúng kích thước gốc, phóng to thì ký hiệu to theo, thu nhỏ thì nhỏ theo"></select></div>
-          <div class="row" id="hatchRow" hidden><input id="showHatch" type="checkbox"><label for="showHatch">Ký hiệu hatch như ArcGIS</label></div>
+          <div class="row" id="hatchRow" hidden><input id="showHatch" type="checkbox"><label for="showHatch">Ký hiệu như ArcGIS (hatch, biểu tượng)</label></div>
         </div>
       </details>
       <details class="sec" open>
@@ -453,7 +453,7 @@ const CONFIG = {
   PROJECT_KEY: 'suoihai',
   DB_PREFIX: 'suoihai/',
   DATA_DIR: '',
-  HATCH_FILE: 'kyhieu_hatch.json',      // ký hiệu hatch xuất từ ArcGIS Pro (cim2hatch.py); xoá dòng này = chỉ tô màu
+  HATCH_FILE: 'kyhieu_hatch.json',      // ký hiệu xuất từ ArcGIS Pro: hatch vùng (cim2hatch.py) + biểu tượng điểm (cim2svg.py); xoá dòng này = chỉ tô màu
   HATCH_DEFAULT: true,                   // mở trang là hiện hatch (người xem tắt được ở mục Hiển thị)
   HIDE_RE: /^bt_/,                       // trường kỹ thuật do công cụ chuẩn hoá sinh ra: ẩn mặc định
   ZONE: null,                            // không có lớp ô quy hoạch
@@ -506,8 +506,8 @@ const LAYERS = [
   sddLayer('QHDD', 'Quy hoạch ngắn hạn', true, { weight: 1.6, stroke: '#333' }),
   sddLayer('QHDH', 'Quy hoạch dài hạn', true, { weight: 1.6, stroke: '#333', dash: '6 4' }),
   // ---- Hạ tầng xã hội ----
-  { id: 'Chuc_nang_cong_trinh', group: 'Công trình công cộng', title: 'Chức năng công trình', geom: 'point', cat: 'phanLoai', radius: 5.5, hitPri: 2,
-    colors: { 'Nhà văn hóa, thư viện, nhà hát': '#ae3ec9', 'Trường mầm non': '#fab005', 'Trường tiểu học': '#f08c00', 'Trường trung học cơ sở': '#e8590c', 'Trường trung học phổ thông': '#c92a2a', 'Trung tâm y tế': '#e64980', 'Cảng tổng hợp': '#1c7ed6' },
+  { id: 'Chuc_nang_cong_trinh', group: 'Công trình công cộng', title: 'Chức năng công trình', geom: 'point', hatch: 'ccct', cat: 'phanLoai', radius: 5.5, hitPri: 2,
+    colors: { 'Nhà văn hóa, thư viện, nhà hát': '#ae3ec9', 'Trường mầm non': '#fab005', 'Trường tiểu học': '#f08c00', 'Trường trung học cơ sở': '#e8590c', 'Trường trung học phổ thông': '#c92a2a', 'Trung tâm y tế': '#e64980', 'Cảng tổng hợp': '#1c7ed6', 'Chợ': '#63e6be', 'Công nghiệp': '#8335a8', 'Sân Golf': '#71c96e', 'Sân thể thao': '#ff8787', 'Trung tâm hành chính': '#ff0000', 'Trung tâm văn hóa thể thao': '#9775fa' },
     search: 'phanLoai' },
   // ---- Giao thông ----
   { id: 'Cong_trinh_giao_thong_dang_vung', group: 'Giao thông', title: 'Bến xe (mặt bằng)', geom: 'polygon', hatch: 'ctgt', color: '#ced4da', stroke: '#495057', weight: 1.2, fillOpacity: .6, hitPri: 3 },
@@ -522,14 +522,14 @@ const LAYERS = [
     label: { html: p => p.kyHieuMatCat, cls: 'lbl-badge', min: 16, max: 99 }, search: 'tenMatCat', key: p => p.tenMatCat },
   { id: 'Huong_di', group: 'Giao thông', title: 'Hướng đi', geom: 'line', color: '#f08c00', weight: 2.5,
     label: { html: p => p.tenHuongDi, cls: 'lbl-sm', color: '#b35900', min: 13, max: 99 }, key: p => p.tenHuongDi },
-  { id: 'Cong_trinh_giao_thong_dang_diem', group: 'Giao thông', title: 'Bến xe, bến cảng', geom: 'point', cat: 'phanLoai', radius: 6, showNote: true,
+  { id: 'Cong_trinh_giao_thong_dang_diem', group: 'Giao thông', title: 'Bến xe, bến cảng', geom: 'point', hatch: 'ctgtd', cat: 'phanLoai', radius: 6, showNote: true,
     colors: { 'Bến xe': '#495057', 'Cảng tổng hợp': '#1c7ed6' } },
   // ---- Thoát nước mưa, chuẩn bị kỹ thuật ----
   { id: 'Mang_luoi_thoat_nuoc_mua', group: 'Thoát nước mưa', title: 'Tuyến cống thoát nước mưa', geom: 'line', cat: 'phanLoai', weight: 3,
     colors: { 'Cống hộp 800x800': '#74c0fc', 'Cống hộp 1000x1000': '#1c7ed6', 'Cống hộp 1200x1200': '#0b4f9c' },
     label: { html: p => isEmpty(p.chieuRong) ? null : 'B' + p.chieuRong + 'x' + p.chieuCao, cls: 'lbl-sm', color: '#0b4f9c', min: 16, max: 99 } },
   { id: 'Huong_thoat_nuoc_mua', group: 'Thoát nước mưa', title: 'Hướng thoát nước mưa', geom: 'line', color: '#339af0', weight: 2, dash: '5 3' },
-  { id: 'Cong_trinh_chuan_bi_ky_thuat_dang_diem', group: 'Thoát nước mưa', title: 'Miệng xả', geom: 'point', color: '#d62728', radius: 4.5 },
+  { id: 'Cong_trinh_chuan_bi_ky_thuat_dang_diem', group: 'Thoát nước mưa', title: 'Miệng xả', geom: 'point', hatch: 'cbkt', color: '#d62728', radius: 4.5 },
   // ---- Thoát nước thải, vệ sinh môi trường ----
   { id: 'Mang_luoi_thoat_nuoc_thai', group: 'Thoát nước thải, VSMT', title: 'Tuyến cống thoát nước thải', geom: 'line', color: '#8b5a2b', weight: 2.6 },
   { id: 'Cong_trinh_thoat_nuoc_thai_va_ve_sinh_moi_truong_dang_vung', group: 'Thoát nước thải, VSMT', title: 'Công trình VSMT (mặt bằng)', geom: 'polygon', cat: 'phanLoai', stroke: '#495057', weight: 1, fillOpacity: .65, hitPri: 3, showNote: true,
@@ -542,7 +542,7 @@ const LAYERS = [
     colors: { 'Đường ống Ø100': '#74c0fc', 'Đường ống Ø200': '#339af0', 'Đường ống Ø300': '#1c7ed6', 'Đường ống Ø400': '#1864ab', 'Đường ống Ø800': '#0b2e6b' },
     styleBy: p => ({ weight: Number(p.duongKinh) >= 400 ? 4.5 : Number(p.duongKinh) >= 300 ? 3.2 : 2.2 }),
     label: { html: p => isEmpty(p.duongKinh) ? null : 'Ø' + p.duongKinh, cls: 'lbl-sm', color: '#0b4f9c', min: 15, max: 99 } },
-  { id: 'Diem_dau_noi', group: 'Cấp nước', title: 'Điểm đấu nối cấp nước', geom: 'point', color: '#fab005', radius: 7, showNote: true,
+  { id: 'Diem_dau_noi', group: 'Cấp nước', title: 'Điểm đấu nối cấp nước', geom: 'point', hatch: 'ddn', color: '#fab005', radius: 7, showNote: true,
     label: { html: p => firstLine(p.ghiChu), cls: 'lbl-sm', color: '#8a5a00', min: 13, max: 99 } }
 ];
 const GROUP_ORDER = ['Sử dụng đất', 'Công trình công cộng', 'Giao thông', 'Thoát nước mưa', 'Thoát nước thải, VSMT', 'Cấp nước', 'Nền'];   // 'Nền' luôn ở cuối (vẽ dưới cùng)
@@ -787,7 +787,26 @@ function setRefScale(v) {
 /* ---------- Ký hiệu hatch xuất từ ArcGIS Pro (CONFIG.HATCH_FILE, tạo bằng cim2hatch.py) ----------
    Mỗi lớp khai báo hatch: '<khoá trong file>' ; mỗi loại = { o: màu viền, ow: rộng viền (pt), t: [rộng, cao ô lặp] (pt),
    s: [[màu nét, rộng nét (pt), 'path SVG trong ô']] }. Kích thước tính theo pt như ArcGIS (1 pt = 4/3 px màn hình). */
-const HATCH = { data: null, pat: {}, url: {} };
+const HATCH = { data: null, pat: {}, url: {}, img: {} };
+/* Điểm vẽ bằng biểu tượng (SVG xuất từ ArcGIS bằng cim2svg.py) trên cùng canvas với các lớp khác */
+const SymMarker = L.CircleMarker.extend({
+  _updatePath() {
+    const img = this.options.symImg, rd = this._renderer;
+    if (!img || !img.complete || !img.naturalWidth) return L.CircleMarker.prototype._updatePath.call(this);
+    if (!rd._drawing || this._empty()) return;
+    const p = this._point, r = this._radius, ctx = rd._ctx;
+    ctx.globalAlpha = this.options.opacity == null ? 1 : this.options.opacity;
+    ctx.drawImage(img, p.x - r, p.y - r, 2 * r, 2 * r); ctx.globalAlpha = 1;
+  }
+});
+function symDef(def, cls) { const set = def.hatch && HATCH.data && HATCH.data[def.hatch]; const h = set && (set[cls] || set['*']); return h && h.svg ? h : null; }
+const symUrl = h => 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(h.svg);
+function symImg(def, cls) {
+  const h = symDef(def, cls); if (!h) return null;
+  const k = def.hatch + '|' + cls; let im = HATCH.img[k];
+  if (!im) { im = HATCH.img[k] = new Image(); im.onload = () => restyleAll(d => d.hatch === def.hatch); im.src = symUrl(h); }
+  return im;
+}
 S.hatch = CONFIG.HATCH_DEFAULT !== false;
 function loadHatch() {
   if (!CONFIG.HATCH_FILE) return Promise.resolve();
@@ -816,8 +835,10 @@ function hatchUrl(def, cls) {   // ảnh ô lặp cho ô chú giải
   const k = def.hatch + '|' + cls; if (k in HATCH.url) return HATCH.url[k];
   const c = hatchTile(def, cls, 2); return (HATCH.url[k] = c ? c.toDataURL() : null);
 }
-const hatchOn = def => S.hatch && !!def.hatch && def.geom === 'polygon' && !!HATCH.data;
+const hatchOn = def => S.hatch && !!def.hatch && (def.geom === 'polygon' || def.geom === 'point') && !!HATCH.data;
+const symCls = (def, f) => def.hatchField ? String(f.properties[def.hatchField] ?? '').trim() : f._cat;
 function swStyle(def, cls, color) {   // style cho ô màu (bảng lớp, chú giải)
+  if (hatchOn(def) && def.geom === 'point') { const h = symDef(def, cls); if (h) return `background:url('${symUrl(h).replace(/'/g, '%27')}') center/contain no-repeat;border:0;border-radius:0;width:17px;height:17px`; }
   if (hatchOn(def)) { const h = hatchDef(def, cls), u = h && hatchUrl(def, cls);
     if (u) return `background:#fff url(${u}) 0 0/${(h.t[0] * 2 / 3).toFixed(1)}px ${(h.t[1] * 2 / 3).toFixed(1)}px;border:1px solid rgb(${h.o})`; }
   return `background:${color}`;
@@ -827,13 +848,17 @@ function refreshSwatches() {
 }
 function styleBase(def, f) {
   const c = (def.catColor && def.catColor[f._cat]) || def.color, k = def.op * def.opG * S.opAll;
+  if (def.geom === 'point' && hatchOn(def)) {
+    const cls = symCls(def, f), h = symDef(def, cls), im = h && symImg(def, cls);
+    if (im) return { radius: h.sz * 2 / 3 * (def.radius / (symBase(def).radius || def.radius)), symImg: im, opacity: k, stroke: false, fill: false };
+  }
   if (def.geom === 'polygon' && def.fill !== false && hatchOn(def)) {
-    const h = hatchDef(def, f._cat), p = h && hatchPattern(def, f._cat);
+    const h = hatchDef(def, symCls(def, f)), p = h && hatchPattern(def, symCls(def, f));
     if (p) return { stroke: def.weight > 0, color: def._strokeSet ? def.stroke : `rgb(${h.o})`, weight: def.weight, opacity: k, fill: true, fillColor: p, fillOpacity: k, dashArray: def.dash || null };
   }
   if (def.geom === 'polygon') return { stroke: def.weight > 0, color: def.stroke, weight: def.weight, opacity: k, fill: def.fill !== false, fillColor: c, fillOpacity: def.fillOpacity * k, dashArray: def.dash || null };
   if (def.geom === 'line') return { color: c, weight: def.weight, opacity: k, dashArray: def.dash || null, lineCap: def.dash ? 'butt' : 'round' };
-  return { radius: def.radius, color: '#fff', weight: 1, opacity: k, fillColor: c, fillOpacity: k };
+  return { radius: def.radius, color: '#fff', weight: 1, opacity: k, fillColor: c, fillOpacity: k, stroke: true, fill: true, symImg: null };
 }
 // Tất cả lớp vẽ chung 1 canvas (1 pane) thay vì mỗi lớp 1 canvas toàn màn hình → zoom/kéo nhanh hơn nhiều.
 // Thứ tự chồng lớp do fixOrder() giữ theo def.order.
@@ -846,7 +871,7 @@ function initGroup(def) {
   def.gl = L.geoJSON(null, {
     pane: 'vec', renderer: VEC, interactive: false,
     style: f => styleOf(def, f),
-    pointToLayer: (f, ll) => L.circleMarker(ll, { pane: 'vec', renderer: VEC, interactive: false })
+    pointToLayer: (f, ll) => new SymMarker(ll, { pane: 'vec', renderer: VEC, interactive: false })
   });
 }
 let orderQ = false;
@@ -966,7 +991,7 @@ function drawLabelsNow() {
 function hitTest(ll) {
   const z = map.getZoom(), kx = Math.cos(ll.lat * Math.PI / 180);
   const degPerPx = 156543.03392 * kx / Math.pow(2, z) / 111320;
-  const tolLine = 7 * degPerPx, tolPt = 10 * degPerPx;
+  const tolLine = 7 * degPerPx, tolPt = Math.max(10, 12 * RS.k) * degPerPx;   // điểm vẽ bằng biểu tượng to theo tỷ lệ tham chiếu
   const hits = [];
   defs.forEach(def => {
     if (!def.on || !def.feats.length) return;
@@ -1059,7 +1084,7 @@ function printReport() {
 function swatchHtml(def) {
   const c = def.cats ? def.cats[0].color : def.color;
   if (def.geom === 'line') return `<span class="swatch line" style="border-top-color:${c};${def.dash ? 'border-top-style:dashed' : ''}"></span>`;
-  if (def.geom === 'point') return `<span class="swatch dot" style="background:${c}"></span>`;
+  if (def.geom === 'point') { const cn = def.cats ? def.cats[0].name : '*'; return `<span class="swatch dot" data-sw="${esc(def.id + '|' + cn)}" data-c="${c}" style="${swStyle(def, cn, c)}"></span>`; }
   if (def.fill === false) return `<span class="swatch" style="background:transparent;border:2px solid ${def.stroke}"></span>`;
   const cn = def.cats ? def.cats[0].name : '*';
   return `<span class="swatch" data-sw="${esc(def.id + '|' + cn)}" data-c="${c}" style="${swStyle(def, cn, c)}"></span>`;
@@ -2480,7 +2505,7 @@ function symDlg(def) {
   const catRows = multi ? def.cats.map((c, i) => `<label class="sy-cat"><input type="color" data-cat="${i}" data-name="${esc(c.name)}" value="${toHex(c.color)}"><span>${esc(c.name)}</span></label>`).join('') : '';
   const card = dlg(`<h2>Ký hiệu lớp</h2><p class="muted">${esc(def.title)} · ${poly ? 'vùng' : line ? 'đường' : 'điểm'}</p>
     <form class="sy-form">
-      ${hasHatch ? `<label class="chk"><input type="checkbox" name="hatch"${def.hatch ? ' checked' : ''}> Dùng ký hiệu hatch ArcGIS <span class="muted">(khi bật, màu tô bên dưới không áp dụng)</span></label>` : ''}
+      ${hasHatch ? `<label class="chk"><input type="checkbox" name="hatch"${def.hatch ? ' checked' : ''}> Dùng ký hiệu ArcGIS <span class="muted">(hatch / biểu tượng; khi bật, màu bên dưới không áp dụng)</span></label>` : ''}
       ${def.fill === false ? '' : multi ? `<div class="sy-h">Màu theo loại (${def.cats.length})</div><div class="sy-cats">${catRows}</div>` : `<label class="sy-row"><span>${poly ? 'Màu tô' : 'Màu'}</span><input type="color" name="color" value="${toHex(def.color)}"></label>`}
       ${poly ? `<label class="sy-row"><span>Màu viền</span><input type="color" name="stroke" value="${toHex(def.stroke)}"></label>` : ''}
       ${pt ? `<label class="sy-row"><span>Bán kính điểm (px)</span><input type="number" name="radius" min="1" max="40" step="0.5" value="${def.radius}"></label>`
