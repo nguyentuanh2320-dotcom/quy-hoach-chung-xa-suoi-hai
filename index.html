@@ -704,9 +704,10 @@ function labelPoint(geom) {
 }
 
 /* ===================== NẠP DỮ LIỆU ===================== */
+const BUILD_ID = '20261124155422';   // mã bản build: gắn vào đường dẫn file để trình duyệt không dùng bản lưu đệm cũ sau khi cập nhật
 const FILE_CACHE = {};   // nhiều lớp có thể đọc chung 1 file (def.src) và lọc bằng def.where
 function fetchJson(name) {
-  if (!FILE_CACHE[name]) FILE_CACHE[name] = fetch((CONFIG.DATA_DIR || '') + name + '.geojson').then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); });
+  if (!FILE_CACHE[name]) FILE_CACHE[name] = fetch((CONFIG.DATA_DIR || '') + name + '.geojson?v=' + BUILD_ID).then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); });
   return FILE_CACHE[name];
 }
 async function loadLayer(def) {
@@ -810,7 +811,7 @@ function symImg(def, cls) {
 S.hatch = CONFIG.HATCH_DEFAULT !== false;
 function loadHatch() {
   if (!CONFIG.HATCH_FILE) return Promise.resolve();
-  return fetch((CONFIG.DATA_DIR || '') + CONFIG.HATCH_FILE).then(r => r.ok ? r.json() : null).then(j => { HATCH.data = j; }).catch(() => {});
+  return fetch((CONFIG.DATA_DIR || '') + CONFIG.HATCH_FILE + '?v=' + BUILD_ID).then(r => r.ok ? r.json() : null).then(j => { HATCH.data = j; }).catch(() => {});
 }
 function hatchDef(def, cls) { const set = def.hatch && HATCH.data && HATCH.data[def.hatch]; const h = set && (set[cls] || set['*']); return h && h.t ? h : null; }
 function hatchTile(def, cls, m) {   // vẽ 1 ô lặp ở độ phân giải m (px thiết bị / px CSS)
